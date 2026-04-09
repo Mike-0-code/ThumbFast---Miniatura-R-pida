@@ -598,7 +598,7 @@
             // TECLADO COMPLETO
             window.addEventListener('keydown', (e) => {
                 // Delete
-                if (e.key === 'Delete' && this.currentSelectedObject) {
+                if ((e.key === 'Delete' || e.key === 'Supr' || e.key === 'Backspace') && this.currentSelectedObject) {
                     this.handleDelete();
                     e.preventDefault();
                 }
