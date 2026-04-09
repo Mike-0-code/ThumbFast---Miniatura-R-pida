@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ThumbFast - Miniatura Rápida</title>
+    <!-- Fabric.js con protocolo relativo para HTTPS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0a0a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #e0e0e0;
+        }
+
+        .top-bar {
+            background-color: #111111;
+            padding: 8px 16px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #2a2a2a;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            background: none;
+            border: none;
+            color: #b0b0b0;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .tool-btn:hover {
+            background-color: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .left-panel {
+            width: 260px;
+            background-color: #141414;
+            border-right: 1px solid #2a2a2a;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+            z-index: 5;
+        }
+
+        .panel-section {
+            border-bottom: 1px solid #2a2a2a;
+            padding-bottom: 16px;
+        }
+
+        .panel-section h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: #cccccc;
+            letter-spacing: 0.5px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 6px;
+            color: #aaa;
+        }
+
+        select, input[type="color"], input[type="number"] {
+            background-color: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            color: #e0e0e0;
+            padding: 6px 8px;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 13px;
+        }
+
+        .shape-type-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .shape-type-btn {
+            background-color: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            color: #ccc;
+            padding: 6px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        .shape-type-btn.active {
+            background-color: #3a6ea5;
+            border-color: #5a8ec5;
+            color: white;
+        }
+
+        .slider {
+            width: 100%;
+            cursor: pointer;
+            background: #2a2a2a;
+            accent-color: #3a6ea5;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            margin-top: 16px;
+            font-style: italic;
+        }
+
+        .canvas-container-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #0a0a0a;
+            position: relative;
+            overflow: auto;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            display: inline-block;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        .placeholder-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            background-color: #2a2a2a;
+            color: #555;
+            font-size: 48px;
+            font-weight: 100;
+            border: 2px dashed #444;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .placeholder-overlay:hover {
+            background-color: #3a3a3a;
+            color: #777;
+        }
+
+        .has-image .placeholder-overlay {
+            display: none;
+        }
+
+        .download-btn {
+            background-color: #2a6e3a;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        
+        .download-btn:hover {
+            background-color: #3a8e4a;
+        }
+
+        @media (max-width: 768px) {
+            .left-panel {
+                width: 220px;
+            }
+            .tool-btn {
+                font-size: 18px;
+                padding: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <button class="tool-btn" id="tool-text" title="Agregar texto (T)">📝 Texto</button>
+    <button class="tool-btn" id="tool-shape" title="Agregar forma">⬛ Forma</button>
+    <button class="tool-btn" id="tool-bg" title="Color de fondo sólido">🎨 Fondo</button>
+    <button class="tool-btn" id="tool-preset" title="Presets de tamaño">📏 Tamaño</button>
+    <button class="tool-btn download-btn" id="tool-download" title="Descargar PNG">💾 Descargar</button>
+</div>
+
+<div class="main-layout">
+    <div class="left-panel" id="left-panel">
+        <div class="panel-section">
+            <h3>📝 Texto</h3>
+            <div class="control-group">
+                <label>Fuente</label>
+                <select id="font-family">
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Impact">Impact</option>
+                    <option value="Comic Sans MS">Comic Sans MS</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Tamaño (px)</label>
+                <input type="number" id="font-size" value="48" min="12" max="200" step="2">
+            </div>
+            <div class="control-group">
+                <label>Color</label>
+                <input type="color" id="text-color" value="#ffffff">
+            </div>
+            <div class="control-group">
+                <label>Alineación</label>
+                <select id="text-align">
+                    <option value="left">Izquierda</option>
+                    <option value="center">Centro</option>
+                    <option value="right">Derecha</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>🔷 Forma</h3>
+            <div class="control-group">
+                <label>Tipo</label>
+                <div class="shape-type-buttons" id="shape-type-selector">
+                    <div class="shape-type-btn active" data-shape="rect">■ Rect</div>
+                    <div class="shape-type-btn" data-shape="circle">● Circ</div>
+                    <div class="shape-type-btn" data-shape="triangle">▲ Tri</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Relleno</label>
+                <input type="color" id="shape-fill" value="#ff5555">
+            </div>
+            <div class="control-group">
+                <label>Borde</label>
+                <input type="color" id="stroke-color" value="#ffffff">
+            </div>
+            <div class="control-group">
+                <label>Grosor borde (px)</label>
+                <input type="number" id="stroke-width" value="3" min="1" max="15">
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>🎨 Fondo Lienzo</h3>
+            <div class="control-group">
+                <input type="color" id="canvas-bg-color" value="#2a2a2a">
+                <button id="apply-bg-btn" style="margin-top:8px; width:100%; background:#2a2a2a; border:1px solid #3a3a3a; color:white; padding:6px; border-radius:6px; cursor:pointer;">Aplicar fondo</button>
+            </div>
+        </div>
+        <div class="status-text" id="status-msg">
+            💡 Haz clic en el "+" para agregar una imagen
+        </div>
+    </div>
+
+    <div class="canvas-container-wrapper" id="canvas-container">
+        <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="canvas" width="800" height="450"></canvas>
+            <div class="placeholder-overlay" id="placeholder">+ Click para agregar imagen</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Esperar a que todo el DOM y Fabric.js estén listos
+    document.addEventListener('DOMContentLoaded', function() {
+        // Verificar que Fabric está disponible
+        if (typeof fabric === 'undefined') {
+            alert('Error: Fabric.js no se cargó correctamente. Por favor, recarga la página.');
+            return;
+        }
+
+        // Configuración inicial del canvas
+        const canvas = new fabric.Canvas('canvas');
+        let currentSelectedObject = null;
+        let hasImage = false;
+        let currentShapeType = 'rect';
+
+        // Inicializar fondo
+        canvas.setBackgroundColor('#2a2a2a', canvas.renderAll.bind(canvas));
+        canvas.renderAll();
+
+        // Zoom con rueda del mouse
+        const container = document.getElementById('canvas-container');
+        let zoomLevel = 1;
+        
+        canvas.on('mouse:wheel', function(opt) {
+            const delta = opt.e.deltaY;
+            let zoom = zoomLevel;
+            zoom *= 0.999 ** delta;
+            if (zoom > 5) zoom = 5;
+            if (zoom < 0.2) zoom = 0.2;
+            canvas.setZoom(zoom);
+            zoomLevel = zoom;
+            opt.e.preventDefault();
+            opt.e.stopPropagation();
+        });
+
+        // Función para actualizar el estado de hasImage
+        function updateHasImageStatus() {
+            const images = canvas.getObjects().filter(obj => obj.type === 'image');
+            hasImage = images.length > 0;
+            if (hasImage) {
+                document.getElementById('canvas-wrapper').classList.add('has-image');
+            } else {
+                document.getElementById('canvas-wrapper').classList.remove('has-image');
+            }
+        }
+
+        // Función para agregar imagen
+        function addImageFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                fabric.Image.fromURL(event.target.result, function(img) {
+                    const maxWidth = canvas.width * 0.9;
+                    const maxHeight = canvas.height * 0.9;
+                    let scale = 1;
+                    if (img.width > maxWidth) scale = maxWidth / img.width;
+                    if (img.height * scale > maxHeight) scale = maxHeight / img.height;
+                    img.scale(scale);
+                    img.set({
+                        left: (canvas.width - img.width * scale) / 2,
+                        top: (canvas.height - img.height * scale) / 2,
+                        selectable: true,
+                        hasControls: true,
+                        hasBorders: true
+                    });
+                    canvas.add(img);
+                    canvas.setActiveObject(img);
+                    updateHasImageStatus();
+                    canvas.renderAll();
+                    updatePanelForObject(img);
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Click en el placeholder
+        const placeholderDiv = document.getElementById('placeholder');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        
+        placeholderDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e2) => {
+                if (e2.target.files && e2.target.files[0]) {
+                    addImageFromFile(e2.target.files[0]);
+                }
+            };
+            input.click();
+        });
+
+        // Arrastrar imagen
+        const containerDiv = document.getElementById('canvas-container');
+        containerDiv.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        containerDiv.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                addImageFromFile(file);
+            }
+        });
+
+        // Crear forma
+        function createShape(type, left, top, fill, stroke, strokeWidth) {
+            let shape;
+            const size = 80;
+            switch(type) {
+                case 'rect':
+                    shape = new fabric.Rect({
+                        width: size, height: size, fill: fill, stroke: stroke, strokeWidth: strokeWidth,
+                        left: left, top: top, originX: 'center', originY: 'center'
+                    });
+                    break;
+                case 'circle':
+                    shape = new fabric.Circle({
+                        radius: size/2, fill: fill, stroke: stroke, strokeWidth: strokeWidth,
+                        left: left, top: top, originX: 'center', originY: 'center'
+                    });
+                    break;
+                case 'triangle':
+                    shape = new fabric.Triangle({
+                        width: size, height: size, fill: fill, stroke: stroke, strokeWidth: strokeWidth,
+                        left: left, top: top, originX: 'center', originY: 'center'
+                    });
+                    break;
+                default:
+                    shape = new fabric.Rect({
+                        width: size, height: size, fill: fill, stroke: stroke, strokeWidth: strokeWidth,
+                        left: left, top: top, originX: 'center', originY: 'center'
+                    });
+            }
+            shape.customType = 'shape';
+            return shape;
+        }
+
+        // Reemplazar forma (función movida antes de usarse)
+        function replaceShape(oldShape) {
+            const newShape = createShape(currentShapeType, oldShape.left, oldShape.top, 
+                                        oldShape.fill, oldShape.stroke, oldShape.strokeWidth);
+            canvas.remove(oldShape);
+            canvas.add(newShape);
+            canvas.setActiveObject(newShape);
+            canvas.renderAll();
+            updatePanelForObject(newShape);
+        }
+
+        // Herramientas
+        document.getElementById('tool-text').addEventListener('click', () => {
+            if (!hasImage) {
+                alert("⚠️ Primero agrega una imagen de fondo haciendo clic en el '+'");
+                return;
+            }
+            const text = new fabric.IText('Texto', {
+                left: canvas.width/2 - 50,
+                top: canvas.height/2 - 20,
+                fontFamily: document.getElementById('font-family').value,
+                fontSize: parseInt(document.getElementById('font-size').value),
+                fill: document.getElementById('text-color').value,
+                textAlign: document.getElementById('text-align').value,
+                hasControls: true,
+                padding: 5
+            });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            canvas.renderAll();
+            updatePanelForObject(text);
+        });
+
+        // Selector de tipo de forma
+        document.querySelectorAll('.shape-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.shape-type-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentShapeType = btn.getAttribute('data-shape');
+                if (currentSelectedObject && currentSelectedObject.customType === 'shape') {
+                    replaceShape(currentSelectedObject);
+                }
+            });
+        });
+
+        document.getElementById('tool-shape').addEventListener('click', () => {
+            if (!hasImage) {
+                alert("⚠️ Primero agrega una imagen de fondo haciendo clic en el '+'");
+                return;
+            }
+            const fill = document.getElementById('shape-fill').value;
+            const stroke = document.getElementById('stroke-color').value;
+            const strokeWidth = parseInt(document.getElementById('stroke-width').value);
+            const shape = createShape(currentShapeType, canvas.width/2, canvas.height/2, fill, stroke, strokeWidth);
+            canvas.add(shape);
+            canvas.setActiveObject(shape);
+            canvas.renderAll();
+            updatePanelForObject(shape);
+        });
+
+        // Fondo de lienzo
+        document.getElementById('apply-bg-btn').addEventListener('click', () => {
+            const color = document.getElementById('canvas-bg-color').value;
+            canvas.setBackgroundColor(color, canvas.renderAll.bind(canvas));
+        });
+
+        // Presets de tamaño
+        document.getElementById('tool-preset').addEventListener('click', () => {
+            const preset = prompt("Elige preset:\n- YouTube (1280x720)\n- Twitter (1200x675)\n- Instagram (1080x1080)", "YouTube");
+            let width, height;
+            if (!preset) return;
+            
+            if (preset.toLowerCase().includes('youtube')) { 
+                width = 1280; 
+                height = 720; 
+            } else if (preset.toLowerCase().includes('twitter')) { 
+                width = 1200; 
+                height = 675; 
+            } else if (preset.toLowerCase().includes('instagram')) { 
+                width = 1080; 
+                height = 1080; 
+            } else { 
+                alert("No reconocido. Usando YouTube (1280x720)"); 
+                width = 1280; 
+                height = 720; 
+            }
+            
+            canvas.setWidth(width);
+            canvas.setHeight(height);
+            canvas.renderAll();
+        });
+
+        // Descargar
+        document.getElementById('tool-download').addEventListener('click', () => {
+            if (canvas.getObjects().length === 0) {
+                alert("⚠️ No hay nada para descargar. Agrega una imagen primero.");
+                return;
+            }
+            const link = document.createElement('a');
+            link.download = 'miniatura.png';
+            link.href = canvas.toDataURL({ format: 'png', quality: 1 });
+            link.click();
+        });
+
+        // Actualizar panel según objeto seleccionado
+        function updatePanelForObject(obj) {
+            if (!obj) {
+                document.getElementById('status-msg').innerHTML = "✨ Selecciona un elemento para personalizar";
+                currentSelectedObject = null;
+                return;
+            }
+            currentSelectedObject = obj;
+            
+            if (obj.type === 'i-text' || obj.type === 'text') {
+                document.getElementById('status-msg').innerHTML = `✏️ Editando: Texto`;
+                document.getElementById('font-family').value = obj.fontFamily || 'Arial';
+                document.getElementById('font-size').value = obj.fontSize || 48;
+                document.getElementById('text-color').value = obj.fill || '#ffffff';
+                document.getElementById('text-align').value = obj.textAlign || 'center';
+            } 
+            else if (obj.customType === 'shape') {
+                document.getElementById('status-msg').innerHTML = `🔷 Editando: Forma`;
+                document.getElementById('shape-fill').value = obj.fill || '#ff5555';
+                document.getElementById('stroke-color').value = obj.stroke || '#ffffff';
+                document.getElementById('stroke-width').value = obj.strokeWidth || 3;
+                
+                let shapeType = 'rect';
+                if (obj.radius) shapeType = 'circle';
+                else if (obj.type === 'triangle') shapeType = 'triangle';
+                
+                document.querySelectorAll('.shape-type-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('data-shape') === shapeType) btn.classList.add('active');
+                });
+                currentShapeType = shapeType;
+            } else if (obj.type === 'image') {
+                document.getElementById('status-msg').innerHTML = `🖼️ Editando: Imagen`;
+            }
+        }
+
+        // Eventos de selección
+        canvas.on('selection:created', (e) => updatePanelForObject(e.selected[0]));
+        canvas.on('selection:updated', (e) => updatePanelForObject(e.selected[0]));
+        canvas.on('selection:cleared', () => updatePanelForObject(null));
+
+        // Modificar propiedades
+        document.getElementById('font-family').addEventListener('change', () => {
+            if (currentSelectedObject && (currentSelectedObject.type === 'i-text' || currentSelectedObject.type === 'text')) {
+                currentSelectedObject.set('fontFamily', document.getElementById('font-family').value);
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('font-size').addEventListener('change', () => {
+            if (currentSelectedObject && (currentSelectedObject.type === 'i-text' || currentSelectedObject.type === 'text')) {
+                currentSelectedObject.set('fontSize', parseInt(document.getElementById('font-size').value));
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('text-color').addEventListener('change', () => {
+            if (currentSelectedObject && (currentSelectedObject.type === 'i-text' || currentSelectedObject.type === 'text')) {
+                currentSelectedObject.set('fill', document.getElementById('text-color').value);
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('text-align').addEventListener('change', () => {
+            if (currentSelectedObject && (currentSelectedObject.type === 'i-text' || currentSelectedObject.type === 'text')) {
+                currentSelectedObject.set('textAlign', document.getElementById('text-align').value);
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('shape-fill').addEventListener('change', () => {
+            if (currentSelectedObject && currentSelectedObject.customType === 'shape') {
+                currentSelectedObject.set('fill', document.getElementById('shape-fill').value);
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('stroke-color').addEventListener('change', () => {
+            if (currentSelectedObject && currentSelectedObject.customType === 'shape') {
+                currentSelectedObject.set('stroke', document.getElementById('stroke-color').value);
+                canvas.renderAll();
+            }
+        });
+        
+        document.getElementById('stroke-width').addEventListener('change', () => {
+            if (currentSelectedObject && currentSelectedObject.customType === 'shape') {
+                currentSelectedObject.set('strokeWidth', parseInt(document.getElementById('stroke-width').value));
+                canvas.renderAll();
+            }
+        });
+
+        // Tecla Delete para eliminar
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' && currentSelectedObject) {
+                canvas.remove(currentSelectedObject);
+                updateHasImageStatus();
+                canvas.renderAll();
+                updatePanelForObject(null);
+                e.preventDefault();
+            }
+        });
+
+        // Render inicial
+        canvas.renderAll();
+        console.log('✅ ThumbFast iniciado correctamente');
+    });
+</script>
+</body>
+</html>
