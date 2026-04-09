@@ -599,7 +599,6 @@
             window.addEventListener('keydown', (e) => {
                 // Delete
                 if ((e.key === 'Delete' || e.key === 'Supr' || e.key === 'Backspace') && this.currentSelectedObject) {
-                    console.log('Ejecutando Delete/Backspace');
                     this.handleDelete();
                     e.preventDefault();
                 }
