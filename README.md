@@ -1,1 +1,1 @@
-# ThumbFast---Miniatura-R-pida
+# MiniFast
